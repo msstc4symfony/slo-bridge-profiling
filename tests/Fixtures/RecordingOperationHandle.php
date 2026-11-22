@@ -35,6 +35,7 @@ final class RecordingOperationHandle implements OperationHandleInterface
     {
         $this->log->add('inner.failExpected');
         $this->reasons[] = $reason;
+        $this->failIfAsked();
     }
 
     #[Override]

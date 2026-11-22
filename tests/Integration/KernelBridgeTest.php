@@ -140,14 +140,8 @@ final class KernelBridgeTest extends TestCase
         }
 
         $rejection = new RejectedValidation('Card declined.');
-        $caught = null;
-        try {
-            $this->monitor()->measure('payment.validation', static fn (): never => throw $rejection);
-        } catch (RejectedValidation $e) {
-            $caught = $e;
-        }
 
-        self::assertSame($rejection, $caught);
+        self::assertSame($rejection, $this->measureFailing('payment.validation', $rejection));
         self::assertSame([$this->endedSpan(self::SPAN, null, ['outcome' => 'expected_failure', 'exception' => RejectedValidation::class])], $this->spans());
         self::assertSame(self::GOOD_EVENTS, $this->sloEvents());
     }

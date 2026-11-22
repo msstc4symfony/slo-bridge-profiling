@@ -65,7 +65,11 @@ final class ProfiledOperationHandle implements OperationHandleInterface
         } finally {
             if (!$this->ended) {
                 $this->ended = true;
-                ($this->endSpan)($this->outcome ?? Outcome::Success, $this->reason);
+                try {
+                    ($this->endSpan)($this->outcome ?? Outcome::Success, $this->reason);
+                } catch (Throwable) {
+                    // The closure reports its own failures; this only guards the operation against a broken one.
+                }
             }
         }
     }

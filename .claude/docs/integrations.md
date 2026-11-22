@@ -12,7 +12,8 @@
   с приоритетом -1024); SLO-события от них не зависят
   (`KernelBridgeTest::testSloEventsDoNotDependOnProfilingDecisions`). Вложенная операция — дочерний спан.
 - **Monolog**: тег `monolog.logger` channel `slo_bundle` на декораторе; `LoggerChannelPass` подставляет
-  `monolog.logger.slo_bundle` в автовайренный `$logger` (`KernelBridgeTest::testAProfilingFailureIsLoggedOnTheSloBundleChannel`: `ThrowingCreateSpanFactory` декорирует
+  `monolog.logger.slo_bundle` в автовайренный `$logger`
+  (`KernelBridgeTest::testAProfilingFailureIsLoggedOnTheSloBundleChannel`: `ThrowingCreateSpanFactory` декорирует
   `ProfilingFactoryInterface`, предупреждение попадает в `TestHandler` с каналом `slo_bundle`).
   С metrics-bundle этот сервис — `HandlerDecorator` metrics-bundle вокруг `Monolog\Logger`, не сам `Logger`.
 - **metrics-bundle**: SLO-события пишет slo-bundle (`SloMetric::EVENTS`, метки `[slo, objective, revision, result]`);

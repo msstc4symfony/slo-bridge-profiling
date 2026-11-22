@@ -105,7 +105,7 @@ final class ProfiledOperationMonitorTest extends TestCase
         self::assertSame(['span.create', 'inner.measure', 'span.end'], $log->calls);
     }
 
-    public function testAnotherDeclaredPointOpensNoSpan(): void
+    public function testANameOtherThanTheDeclaredOneOpensNoSpan(): void
     {
         self::assertSame(42, $this->monitor()->measure('payment.capture', static fn (): int => 42));
         self::assertSame([], $this->profiling->messages);

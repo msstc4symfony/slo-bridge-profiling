@@ -43,8 +43,8 @@ Msstc4Symfony\SloBridgeProfiling\SloBridgeProfilingBundle::class => ['all' => tr
 ```
 
 metrics-bundle is a direct requirement: slo-bundle writes its SLO events through it, so MetricsBundle must be
-registered next to SloBundle. Nothing to configure. Without SloBundle or ProfilingBundle the container fails to compile with a message naming
-the missing bundle.
+registered next to SloBundle. Nothing to configure. Without SloBundle or ProfilingBundle the container fails to
+compile with a message naming the missing bundle.
 
 ## The span
 
