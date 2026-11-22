@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\SloBridgeProfiling\Test\Unit;
 
+use Closure;
 use Msstc4Symfony\SloBridgeProfiling\Infrastructure\Profiling\ProfiledOperationHandle;
 use Msstc4Symfony\SloBridgeProfiling\Infrastructure\Profiling\ProfiledOperationMonitor;
 use Msstc4Symfony\SloBridgeProfiling\Infrastructure\Profiling\SpanEndContext;
@@ -174,6 +175,15 @@ final class ProfiledOperationMonitorTest extends TestCase
         self::assertSame($failure, $this->caught(static fn (): mixed => $monitor->measure(self::NAME, static fn (): never => throw $failure)));
     }
 
+    public function testAFailingLoggerIsSwallowedWhenTheClassifierThrows(): void
+    {
+        $monitor = new ProfiledOperationMonitor($this->inner, $this->profiling, StubSloCatalog::declaring(), new StubClassifier(fail: true), new ThrowingLogger());
+        $failure = new RuntimeException('boom');
+
+        self::assertSame($failure, $this->caught(static fn (): mixed => $monitor->measure(self::NAME, static fn (): never => throw $failure)));
+        self::assertSame([['outcome' => 'error', 'exception' => RuntimeException::class]], $this->profiling->endContexts);
+    }
+
     public function testWithoutALoggerFailuresAreSilent(): void
     {
         $this->profiling = new RecordingProfilingFactory(failOnCreate: true);
@@ -230,9 +240,9 @@ final class ProfiledOperationMonitorTest extends TestCase
     }
 
     /**
-     * @param callable(): mixed $call
+     * @param Closure(): int $call
      */
-    private function caught(callable $call): ?Throwable
+    private function caught(Closure $call): ?Throwable
     {
         try {
             $call();
@@ -248,6 +258,7 @@ final class ProfiledOperationMonitorTest extends TestCase
         self::assertCount(1, $this->logger->records);
         self::assertSame(LogLevel::WARNING, $this->logger->records[0]['level']);
         self::assertSame($message, $this->logger->records[0]['message']);
+        self::assertSame(self::NAME, $this->logger->records[0]['context']['operation'] ?? null);
         self::assertInstanceOf(Throwable::class, $this->logger->records[0]['context']['exception'] ?? null);
     }
 }

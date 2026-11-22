@@ -65,7 +65,7 @@ final readonly class ProfiledOperationMonitor implements OperationMonitorInterfa
 
             throw $e;
         } finally {
-            $this->endSpan($span, $failure);
+            $this->endSpan($name, $span, $failure);
         }
     }
 
@@ -93,16 +93,16 @@ final readonly class ProfiledOperationMonitor implements OperationMonitorInterfa
         }
     }
 
-    private function endSpan(SpanInterface $span, ?Throwable $failure): void
+    private function endSpan(string $name, SpanInterface $span, ?Throwable $failure): void
     {
         try {
-            $this->profiling->endSpan($span, SpanEndContext::of($this->outcome($failure), $failure));
+            $this->profiling->endSpan($span, SpanEndContext::of($this->outcome($name, $failure), $failure));
         } catch (Throwable $e) {
-            $this->warn('SLO operation span could not be ended.', $span->getMessage(), $e);
+            $this->warn('SLO operation span could not be ended.', $name, $e);
         }
     }
 
-    private function outcome(?Throwable $failure): Outcome
+    private function outcome(string $name, ?Throwable $failure): Outcome
     {
         if (!$failure instanceof Throwable) {
             return Outcome::Success;
@@ -111,7 +111,7 @@ final readonly class ProfiledOperationMonitor implements OperationMonitorInterfa
         try {
             return $this->classifier->isExpectedFailure($failure) ? Outcome::ExpectedFailure : Outcome::Error;
         } catch (Throwable $e) {
-            $this->warn('SLO operation exception could not be classified, it counts as an error.', null, $e);
+            $this->warn('SLO operation exception could not be classified, it counts as an error.', $name, $e);
 
             return Outcome::Error;
         }
@@ -120,10 +120,10 @@ final readonly class ProfiledOperationMonitor implements OperationMonitorInterfa
     /**
      * @param non-empty-literal-string $message
      */
-    private function warn(string $message, ?string $operation, Throwable $exception): void
+    private function warn(string $message, string $operation, Throwable $exception): void
     {
         try {
-            $this->logger->warning($message, $operation === null ? ['exception' => $exception] : ['operation' => $operation, 'exception' => $exception]);
+            $this->logger->warning($message, ['operation' => $operation, 'exception' => $exception]);
         } catch (Throwable) {
             // A failing logger must not break the operation.
         }

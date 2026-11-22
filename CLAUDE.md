@@ -14,7 +14,7 @@ Until slo-bundle 1.0.0-rc.2 is tagged, develop against the git-ignored local pro
 `COMPOSER=composer-local.json composer install` (path repo `../monitor-bundle`).
 
 - `make check` — `php -l`, PHPStan level 10, PHP-CS-Fixer, `composer validate --strict`,
-  `composer audit`, Rector dry-run, deptrac. Run as `COMPOSER=composer-ci.json make check`.
+  `composer audit`, Rector dry-run, deptrac. Run as `COMPOSER=composer-local.json make check` (until rc.2 is tagged).
 - `make test` — unit + integration suites; `make infection`, `make fix`, `make regenerate-baseline`.
 - `php ../bundle-standard/bin/verify-standard.php .` — standard compliance (the same check CI runs).
 

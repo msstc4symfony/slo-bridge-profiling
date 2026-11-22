@@ -21,3 +21,7 @@
   Rector (`withPhpVersion(PHP_82)`) и CS-Fixer (`new_expression_parentheses`) обратно не поднимают.
   `#[Override]` (8.3) допустим: на 8.2 атрибут не инстанцируется. Функции 8.4 (`array_any/all/find`) —
   только с `symfony/polyfill-php84` в `require`.
+- **`ProfiledOperationMonitor` не реализует `ResetInterface`**: это безопасно, пока slo-bundle публикует
+  `OperationMonitorInterface` алиасом на `OperationMonitor` с тегом `kernel.reset` — тег остаётся на внутреннем
+  сервисе (`ContainerWiringTest::testKernelResetStaysOnTheInnerMonitor`). Если slo-bundle сделает интерфейс
+  самостоятельным сервисом с тегом, декоратору понадобится `ResetInterface` с делегированием.
