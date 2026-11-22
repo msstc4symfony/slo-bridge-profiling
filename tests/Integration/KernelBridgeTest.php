@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Msstc4Symfony\SloBridgeProfiling\Test\Integration;
 
 use Monolog\Handler\TestHandler;
+use Monolog\Level;
 use Monolog\LogRecord;
 use Msstc4Symfony\LogicBundle\Application\Action\ExpectedFailureInterface;
 use Msstc4Symfony\SloBridgeProfiling\Infrastructure\Profiling\ProfiledOperationMonitor;
@@ -17,11 +18,12 @@ use Msstc4Symfony\SloBundle\Infrastructure\MetricsBundle\SloMetric;
 use Override;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\LoggerInterface;
-use ReflectionProperty;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Filesystem\Filesystem;
 
+/**
+ * @phpstan-import-type EndedSpanShape from RecordingEndProcessor
+ */
 #[CoversNothing]
 final class KernelBridgeTest extends TestCase
 {
@@ -62,17 +64,21 @@ final class KernelBridgeTest extends TestCase
         self::assertSame([], $this->bundleDeprecations);
     }
 
-    public function testTheDecoratorLogsOnTheSloBundleChannel(): void
+    public function testAProfilingFailureIsLoggedOnTheSloBundleChannel(): void
     {
-        $logger = (new ReflectionProperty(ProfiledOperationMonitor::class, 'logger'))->getValue($this->monitor());
-        self::assertInstanceOf(LoggerInterface::class, $logger);
-        self::assertSame($this->container()->get('monolog.logger.slo_bundle'), $logger);
+        $this->boot(unopenableSpans: true);
 
-        $logger->warning('probe');
+        self::assertSame(42, $this->monitor()->measure('payment.validation', static fn (): int => 42));
 
         $handler = $this->container()->get('monolog.handler.main');
         self::assertInstanceOf(TestHandler::class, $handler);
-        self::assertSame(['slo_bundle'], array_map(static fn (LogRecord $record): string => $record->channel, $handler->getRecords()));
+        $warnings = array_values(array_filter($handler->getRecords(), static fn (LogRecord $record): bool => $record->level === Level::Warning));
+        self::assertSame(
+            [['slo_bundle', 'SLO operation span could not be opened, the operation is not profiled.']],
+            array_map(static fn (LogRecord $record): array => [$record->channel, $record->message], $warnings),
+        );
+        self::assertSame([], $this->spans());
+        self::assertSame(self::GOOD_EVENTS, $this->sloEvents());
     }
 
     public function testMeasureRecordsTheSloEventsAndOneOperationSpan(): void
@@ -165,10 +171,10 @@ final class KernelBridgeTest extends TestCase
     /**
      * @param list<string>|null $spanBlacklist
      */
-    private function boot(?array $spanBlacklist = null, bool $unreachableStorage = false): void
+    private function boot(?array $spanBlacklist = null, bool $unreachableStorage = false, bool $unopenableSpans = false): void
     {
         $this->kernel?->shutdown();
-        $this->kernel = new TestKernel('test', false, $spanBlacklist, $unreachableStorage);
+        $this->kernel = new TestKernel('test', false, $spanBlacklist, $unreachableStorage, $unopenableSpans);
         $this->kernel->boot();
     }
 
@@ -194,7 +200,7 @@ final class KernelBridgeTest extends TestCase
     }
 
     /**
-     * @return list<array{message: string, parent: ?string, context: array<string, mixed>}>
+     * @return list<EndedSpanShape>
      */
     private function spans(): array
     {
@@ -215,7 +221,7 @@ final class KernelBridgeTest extends TestCase
         self::assertInstanceOf(RecordingMetricRecorder::class, $recorder);
 
         $events = [];
-        foreach ($recorder->calls as $call) {
+        foreach ($recorder->calls() as $call) {
             if ($call['method'] !== 'increment' || $call['metric'] !== SloMetric::EVENTS) {
                 continue;
             }

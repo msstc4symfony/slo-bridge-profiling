@@ -7,10 +7,12 @@ namespace Msstc4Symfony\SloBridgeProfiling\Test\Integration\Kernel;
 use Msstc4Symfony\LogicBundle\LogicBundle;
 use Msstc4Symfony\MetricsBundle\Application\Port\MetricRecorderInterface;
 use Msstc4Symfony\MetricsBundle\MetricsBundle;
+use Msstc4Symfony\ProfilingBundle\Application\ProfilingFactoryInterface;
 use Msstc4Symfony\ProfilingBundle\ProfilingBundle;
 use Msstc4Symfony\SloBridgeProfiling\SloBridgeProfilingBundle;
 use Msstc4Symfony\SloBridgeProfiling\Test\Fixtures\RecordingEndProcessor;
 use Msstc4Symfony\SloBridgeProfiling\Test\Fixtures\RecordingMetricRecorder;
+use Msstc4Symfony\SloBridgeProfiling\Test\Fixtures\ThrowingCreateSpanFactory;
 use Msstc4Symfony\SloBridgeProfiling\Test\Fixtures\ThrowingMetricRecorder;
 use Msstc4Symfony\SloBundle\SloBundle;
 use Override;
@@ -19,6 +21,8 @@ use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
 use Symfony\Bundle\MonologBundle\MonologBundle;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\HttpKernel\Kernel;
+
+use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
 
 final class TestKernel extends Kernel
 {
@@ -32,6 +36,7 @@ final class TestKernel extends Kernel
         bool $debug,
         private readonly ?array $spanBlacklist = null,
         private readonly bool $unreachableStorage = false,
+        private readonly bool $unopenableSpans = false,
     ) {
         parent::__construct($environment, $debug);
     }
@@ -61,7 +66,7 @@ final class TestKernel extends Kernel
     #[Override]
     public function getCacheDir(): string
     {
-        return self::cacheRoot() . '/cache/' . $this->environment . '-' . md5(serialize([$this->spanBlacklist, $this->unreachableStorage]));
+        return self::cacheRoot() . '/cache/' . $this->environment . '-' . md5(serialize([$this->spanBlacklist, $this->unreachableStorage, $this->unopenableSpans]));
     }
 
     #[Override]
@@ -101,5 +106,8 @@ final class TestKernel extends Kernel
         $services->set(RecordingEndProcessor::class)->autoconfigure()->public();
         $services->set($recorder)->public();
         $services->alias(MetricRecorderInterface::class, $recorder);
+        if ($this->unopenableSpans) {
+            $services->set(ThrowingCreateSpanFactory::class)->decorate(ProfilingFactoryInterface::class)->args([service('.inner')]);
+        }
     }
 }

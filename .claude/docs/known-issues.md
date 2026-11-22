@@ -32,5 +32,5 @@
   metrics-bundle). Канал проверять по записи в `TestHandler` (`monolog.handler.main`), а не через `instanceof Logger`.
 - **PHPStan `deadCode.unreachable` после `measure(fn (): never => throw …)`**: шаблон возврата `measure()` выводит
   `never`, и `self::fail()` после вызова — недостижимый код. Ловить исключение в переменную и проверять после `try`.
-- **Infection**: экранированный мутант `parent::build()` в `SloBridgeProfilingBundle::build()` — эквивалентный
-  (`Bundle::build()` пустой); замер 2026-11-22 UTC — MSI 98.28 % (57/58), пороги 95/95.
+- **Infection**: `SloBridgeProfilingBundle::build()` не вызывает `parent::build()` — в 7.4 и 8.x он пустой, а вызов
+  давал эквивалентный мутант. Замер 2026-11-22 UTC — MSI 100 % (57/57), пороги 97/97.

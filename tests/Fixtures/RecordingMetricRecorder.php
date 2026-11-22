@@ -14,7 +14,15 @@ use Override;
 final class RecordingMetricRecorder implements MetricRecorderInterface
 {
     /** @var list<RecordedCall> */
-    public array $calls = [];
+    private array $calls = [];
+
+    /**
+     * @return list<RecordedCall>
+     */
+    public function calls(): array
+    {
+        return $this->calls;
+    }
 
     #[Override]
     public function increment(MetricDefinitionInterface $metric, array $labels = []): void

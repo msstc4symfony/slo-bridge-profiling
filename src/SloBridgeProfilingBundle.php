@@ -18,8 +18,6 @@ final class SloBridgeProfilingBundle extends AbstractBundle
     #[Override]
     public function build(ContainerBuilder $container): void
     {
-        parent::build($container);
-
         $container->addCompilerPass(new RequireBundlesPass(), PassConfig::TYPE_BEFORE_OPTIMIZATION, RequireBundlesPass::PRIORITY);
     }
 

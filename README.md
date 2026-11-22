@@ -73,8 +73,10 @@ msstc4symfony_profiling:
 SLO counting does not depend on profiling: when a span list or an application decision maker rejects the span,
 the operation still records its SLO events.
 
-With [tracing-bridge-profiling](https://github.com/msstc4symfony/tracing-bridge-profiling) every operation span
-also runs in its own W3C trace span, so logs and outgoing calls inside the operation carry its `span_id`.
+With [tracing-bridge-profiling](https://github.com/msstc4symfony/tracing-bridge-profiling) every recorded operation
+span runs in a child span of the current W3C trace: while the operation runs, tracing-bundle's log records carry that
+span's `span_id`, and outgoing HTTP requests traced by tracing-bundle become its child spans. A span rejected by a
+span list or a decision maker is not recorded and gets no trace span.
 
 ## Fail-open
 
@@ -105,8 +107,9 @@ layers settle, never widen it.
 
 ## Local development
 
-`composer-ci.json` installs every family package from its GitHub repository, plus logic-bundle, FrameworkBundle
-and MonologBundle for the kernel tests.
+`composer-ci.json` installs every family package from its GitHub repository, plus the optional logic-bundle.
+FrameworkBundle and MonologBundle, used by the kernel tests, arrive through the requirements of metrics-bundle and
+profiling-bundle.
 
 ```sh
 make install-ci                        # composer-ci.json profile with every CI tool
