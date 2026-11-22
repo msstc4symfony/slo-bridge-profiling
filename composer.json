@@ -1,5 +1,5 @@
 {
-  "name": "msstc4symfony/skeleton-bundle",
+  "name": "msstc4symfony/slo-bridge-profiling",
   "license": "MIT",
   "authors": [
     {
@@ -8,26 +8,51 @@
     }
   ],
   "type": "symfony-bundle",
-  "description": "Starter template for msstc4symfony Symfony bundles",
+  "description": "Opens a msstc4symfony/profiling-bundle span around every msstc4symfony/slo-bundle operation",
   "minimum-stability": "stable",
   "keywords": [
     "php",
-    "symfony"
+    "symfony",
+    "slo",
+    "sli",
+    "profiling"
   ],
   "prefer-stable": true,
+  "repositories": [
+    {
+      "type": "vcs",
+      "url": "https://github.com/msstc4symfony/slo-bundle"
+    },
+    {
+      "type": "vcs",
+      "url": "https://github.com/msstc4symfony/metrics-bundle"
+    },
+    {
+      "type": "vcs",
+      "url": "https://github.com/msstc4symfony/sql-labeller"
+    },
+    {
+      "type": "vcs",
+      "url": "https://github.com/msstc4symfony/profiling-bundle"
+    }
+  ],
   "autoload": {
     "psr-4": {
-      "Msstc4Symfony\\SkeletonBundle\\": "src/"
+      "Msstc4Symfony\\SloBridgeProfiling\\": "src/"
     }
   },
   "autoload-dev": {
     "psr-4": {
-      "Msstc4Symfony\\SkeletonBundle\\Test\\": "tests/"
+      "Msstc4Symfony\\SloBridgeProfiling\\Test\\": "tests/"
     }
   },
   "require": {
     "php": ">=8.2",
     "composer-runtime-api": ">=2.2",
+    "msstc4symfony/metrics-bundle": "^2.3",
+    "msstc4symfony/profiling-bundle": "^2.3.1",
+    "msstc4symfony/slo-bundle": "^1.0.0-rc.2",
+    "psr/log": "^2.0|^3.0",
     "symfony/config": "^7.4|^8.0",
     "symfony/dependency-injection": "^7.4|^8.0",
     "symfony/http-kernel": "^7.4|^8.0"
@@ -41,6 +66,9 @@
     "phpunit/phpunit": ">=11.0",
     "rector/rector": "^2.1",
     "roave/security-advisories": "dev-latest"
+  },
+  "suggest": {
+    "msstc4symfony/tracing-bridge-profiling": "Puts operation spans into the W3C trace"
   },
   "config": {
     "allow-plugins": {
