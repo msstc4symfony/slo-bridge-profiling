@@ -32,6 +32,7 @@ final class RecordingProfilingFactory implements ProfilingFactoryInterface
     #[Override]
     public function createSpan(string $message, array $context = []): SpanInterface
     {
+        $this->log->add('span.create');
         if ($this->failOnCreate) {
             throw new RuntimeException('createSpan failed');
         }

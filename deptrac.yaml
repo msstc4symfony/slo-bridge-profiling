@@ -1,5 +1,7 @@
-# Canonical layers of bundle-standard v3 (templates/deptrac.yaml); verify-standard compares them after parsing.
-# The ruleset may be narrowed, never widened.
+# Canonical layers of the msstc4symfony bundle standard (stage B spec, section 2).
+# Copy as-is; replace the BundleRoot value with ^<bundle class>$ (deptrac reads an unanchored regex: anchors and
+# doubled backslashes, e.g. ^Msstc4Symfony\\FooBundle\\FooBundle$).
+# A bundle may drop dependencies from the ruleset, never add them.
 deptrac:
     paths:
         - ./src

@@ -18,7 +18,7 @@ use Override;
 use RuntimeException;
 
 /**
- * Answers for the one declared operation, whatever point is asked.
+ * Answers only for the operation point of the declared name, so a wrong point type or key finds nothing.
  */
 final readonly class StubSloCatalog implements SloCatalogInterface
 {
@@ -67,7 +67,7 @@ final readonly class StubSloCatalog implements SloCatalogInterface
             throw new RuntimeException('catalog failed');
         }
 
-        return $this->definitions;
+        return $this->isDeclared($point) ? $this->definitions : [];
     }
 
     #[Override]
@@ -79,6 +79,11 @@ final readonly class StubSloCatalog implements SloCatalogInterface
     #[Override]
     public function conflictedNamesFor(PointId $point): array
     {
-        return $this->conflicted;
+        return $this->isDeclared($point) ? $this->conflicted : [];
+    }
+
+    private function isDeclared(PointId $point): bool
+    {
+        return $point->equals(PointId::of(PointType::Operation, self::DECLARED));
     }
 }

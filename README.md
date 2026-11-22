@@ -27,8 +27,11 @@ composer config repositories.msstc4symfony-metrics vcs https://github.com/msstc4
 composer config repositories.msstc4symfony-sql-labeller vcs https://github.com/msstc4symfony/sql-labeller
 composer config repositories.msstc4symfony-profiling vcs https://github.com/msstc4symfony/profiling-bundle
 composer config repositories.msstc4symfony-slo-bridge-profiling vcs https://github.com/msstc4symfony/slo-bridge-profiling
-composer require msstc4symfony/slo-bridge-profiling:^1.0.0-rc.1
+composer require msstc4symfony/slo-bridge-profiling:^1.0.0-rc.1 msstc4symfony/slo-bundle:^1.0.0-rc.2
 ```
+
+Naming slo-bundle explicitly lets Composer accept its release candidate under `minimum-stability: stable` (only
+root requirements may lower stability); alternatively set `minimum-stability: RC` with `prefer-stable: true`.
 
 Register the bridge in `config/bundles.php` alongside the bundles it connects (order does not matter):
 
@@ -39,7 +42,8 @@ Msstc4Symfony\ProfilingBundle\ProfilingBundle::class => ['all' => true],
 Msstc4Symfony\SloBridgeProfiling\SloBridgeProfilingBundle::class => ['all' => true],
 ```
 
-Nothing to configure. Without SloBundle or ProfilingBundle the container fails to compile with a message naming
+metrics-bundle is a direct requirement: slo-bundle writes its SLO events through it, so MetricsBundle must be
+registered next to SloBundle. Nothing to configure. Without SloBundle or ProfilingBundle the container fails to compile with a message naming
 the missing bundle.
 
 ## The span
@@ -55,6 +59,12 @@ declared under `msstc4symfony_slo.operations`:
 - `measure()` ends the span when the closure returns or throws. A handle from `start()` ends its span in `end()`,
   after the SLO event is recorded; a handle that is never ended leaves its span to profiling-bundle's implicit end
   (when the parent span ends or the profiler is reset); slo-bundle records no event for it either.
+- Handles of nested operations should end innermost first. An outer handle ended before an inner one ends the inner
+  span implicitly (end context `profiling_implicit_end: true`, no `outcome`); the inner handle's later `end()` still
+  records its SLO event with the right outcome, only the span has lost it.
+- The span follows the outcome the bridge sees, not whether slo-bundle recorded an event: if slo-bundle falls back
+  to a no-op handle for a declared name (for example because its clock fails), the span is still ended with an
+  outcome while no SLO event is written; slo-bundle logs that fallback.
 
 Only declared names get a span. An undeclared, empty or invalid name runs the operation without a span (slo-bundle
 logs a warning and records nothing): span messages must stay bounded by the configuration, because
@@ -108,8 +118,8 @@ layers settle, never widen it.
 ## Local development
 
 `composer-ci.json` installs every family package from its GitHub repository, plus the optional logic-bundle.
-FrameworkBundle and MonologBundle, used by the kernel tests, arrive through the requirements of metrics-bundle and
-profiling-bundle.
+FrameworkBundle and MonologBundle, used by the kernel tests, are listed in its `require-dev` and are also required
+by metrics-bundle (both) and profiling-bundle (FrameworkBundle).
 
 ```sh
 make install-ci                        # composer-ci.json profile with every CI tool

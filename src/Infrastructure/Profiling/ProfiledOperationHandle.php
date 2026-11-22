@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\SloBridgeProfiling\Infrastructure\Profiling;
 
-use Msstc4Symfony\ProfilingBundle\Application\ProfilingFactoryInterface;
-use Msstc4Symfony\ProfilingBundle\Application\Span\SpanInterface;
+use Closure;
 use Msstc4Symfony\SloBundle\Application\Port\OperationHandleInterface;
 use Msstc4Symfony\SloBundle\Domain\Enum\Outcome;
 use Override;
@@ -25,10 +24,12 @@ final class ProfiledOperationHandle implements OperationHandleInterface
 
     private bool $ended = false;
 
+    /**
+     * @param Closure(Outcome, ?Throwable): void $endSpan ends the span and reports its own failures
+     */
     public function __construct(
         private readonly OperationHandleInterface $inner,
-        private readonly SpanInterface $span,
-        private readonly ProfilingFactoryInterface $profiling,
+        private readonly Closure $endSpan,
     ) {
     }
 
@@ -64,7 +65,7 @@ final class ProfiledOperationHandle implements OperationHandleInterface
         } finally {
             if (!$this->ended) {
                 $this->ended = true;
-                $this->endSpan();
+                ($this->endSpan)($this->outcome ?? Outcome::Success, $this->reason);
             }
         }
     }
@@ -76,14 +77,5 @@ final class ProfiledOperationHandle implements OperationHandleInterface
         }
         $this->outcome = $outcome;
         $this->reason = $reason;
-    }
-
-    private function endSpan(): void
-    {
-        try {
-            $this->profiling->endSpan($this->span, SpanEndContext::of($this->outcome ?? Outcome::Success, $this->reason));
-        } catch (Throwable) {
-            // ProfilingFactoryInterface::endSpan() already logs; only a broken factory decorator gets here.
-        }
     }
 }

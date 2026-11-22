@@ -10,10 +10,12 @@ use Msstc4Symfony\MetricsBundle\MetricsBundle;
 use Msstc4Symfony\ProfilingBundle\Application\ProfilingFactoryInterface;
 use Msstc4Symfony\ProfilingBundle\ProfilingBundle;
 use Msstc4Symfony\SloBridgeProfiling\SloBridgeProfilingBundle;
+use Msstc4Symfony\SloBridgeProfiling\Test\Fixtures\DomainExceptionClassifier;
 use Msstc4Symfony\SloBridgeProfiling\Test\Fixtures\RecordingEndProcessor;
 use Msstc4Symfony\SloBridgeProfiling\Test\Fixtures\RecordingMetricRecorder;
 use Msstc4Symfony\SloBridgeProfiling\Test\Fixtures\ThrowingCreateSpanFactory;
 use Msstc4Symfony\SloBridgeProfiling\Test\Fixtures\ThrowingMetricRecorder;
+use Msstc4Symfony\SloBundle\Application\Port\ExpectedFailureClassifierInterface;
 use Msstc4Symfony\SloBundle\SloBundle;
 use Override;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
@@ -37,6 +39,7 @@ final class TestKernel extends Kernel
         private readonly ?array $spanBlacklist = null,
         private readonly bool $unreachableStorage = false,
         private readonly bool $unopenableSpans = false,
+        private readonly bool $appClassifier = false,
     ) {
         parent::__construct($environment, $debug);
     }
@@ -66,7 +69,7 @@ final class TestKernel extends Kernel
     #[Override]
     public function getCacheDir(): string
     {
-        return self::cacheRoot() . '/cache/' . $this->environment . '-' . md5(serialize([$this->spanBlacklist, $this->unreachableStorage, $this->unopenableSpans]));
+        return self::cacheRoot() . '/cache/' . $this->environment . '-' . md5(serialize([$this->spanBlacklist, $this->unreachableStorage, $this->unopenableSpans, $this->appClassifier]));
     }
 
     #[Override]
@@ -106,6 +109,11 @@ final class TestKernel extends Kernel
         $services->set(RecordingEndProcessor::class)->autoconfigure()->public();
         $services->set($recorder)->public();
         $services->alias(MetricRecorderInterface::class, $recorder);
+        if ($this->appClassifier) {
+            $services->set(DomainExceptionClassifier::class);
+            $services->alias(ExpectedFailureClassifierInterface::class, DomainExceptionClassifier::class);
+        }
+
         if ($this->unopenableSpans) {
             $services->set(ThrowingCreateSpanFactory::class)->decorate(ProfilingFactoryInterface::class)->args([service('.inner')]);
         }

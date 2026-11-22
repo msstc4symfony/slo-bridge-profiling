@@ -4,7 +4,9 @@
   `kernel.reset` остаётся на внутреннем сервисе). Читаются `SloCatalogInterface::forPoint()` /
   `conflictedNamesFor()` (объявлено ли имя — то же правило, что в `OperationMonitor::start()`) и публичный с rc.2
   `ExpectedFailureClassifierInterface` (классификация как в `measure()`; адаптер выбирает slo-bundle по наличию
-  logic-bundle: `ActionOutcome` → `ExpectedFailureInterface` → null-классификатор).
+  logic-bundle: `ActionOutcome` → `ExpectedFailureInterface` → null-классификатор). Приложение может переопределить
+  алиас своим классификатором — мост и slo-bundle используют один и тот же сервис
+  (`KernelBridgeTest::testExpectedFailureOfAnApplicationClassifierIsTheSameInSpanAndSlo`, флаг `appClassifier`).
 - **profiling-bundle** (`^2.3.1`): `ProfilingFactoryInterface::createSpan()` / `endSpan()`. Решение «писать ли
   спан» принимают decision makers profiling-bundle (`spans.whitelist|blacklist` — префиксы, `ListBasedDecisionMaker`
   с приоритетом -1024); SLO-события от них не зависят

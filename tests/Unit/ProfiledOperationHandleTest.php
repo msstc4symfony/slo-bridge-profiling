@@ -5,26 +5,34 @@ declare(strict_types=1);
 namespace Msstc4Symfony\SloBridgeProfiling\Test\Unit;
 
 use LogicException;
-use Msstc4Symfony\ProfilingBundle\Application\Span\Span;
 use Msstc4Symfony\SloBridgeProfiling\Infrastructure\Profiling\ProfiledOperationHandle;
-use Msstc4Symfony\SloBridgeProfiling\Infrastructure\Profiling\SpanEndContext;
 use Msstc4Symfony\SloBridgeProfiling\Test\Fixtures\CallLog;
 use Msstc4Symfony\SloBridgeProfiling\Test\Fixtures\RecordingOperationHandle;
-use Msstc4Symfony\SloBridgeProfiling\Test\Fixtures\RecordingProfilingFactory;
+use Msstc4Symfony\SloBundle\Domain\Enum\Outcome;
+use Override;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
+use Throwable;
 
 #[CoversClass(ProfiledOperationHandle::class)]
-#[CoversClass(SpanEndContext::class)]
 final class ProfiledOperationHandleTest extends TestCase
 {
+    private CallLog $log;
+
+    /** @var list<array{Outcome, ?Throwable}> */
+    private array $endedWith = [];
+
+    #[Override]
+    protected function setUp(): void
+    {
+        $this->log = new CallLog();
+    }
+
     public function testEndsTheSpanOnceWithTheFirstOutcome(): void
     {
-        $log = new CallLog();
-        $inner = new RecordingOperationHandle($log);
-        $profiling = new RecordingProfilingFactory();
-        $handle = new ProfiledOperationHandle($inner, new Span('operation payment.validation'), $profiling);
+        $inner = new RecordingOperationHandle($this->log);
+        $handle = $this->handle($inner);
         $e = new LogicException('refused');
         $later = new RuntimeException('later');
 
@@ -33,72 +41,51 @@ final class ProfiledOperationHandleTest extends TestCase
         $handle->end();
         $handle->end();
 
-        self::assertSame(['inner.failExpected', 'inner.fail', 'inner.end', 'inner.end'], $log->calls);
+        self::assertSame(['inner.failExpected', 'inner.fail', 'inner.end', 'span.end', 'inner.end'], $this->log->calls);
         self::assertSame([$e, $later], $inner->reasons);
-        self::assertSame([['outcome' => 'expected_failure', 'exception' => $e::class]], $profiling->endContexts);
+        self::assertSame([[Outcome::ExpectedFailure, $e]], $this->endedWith);
     }
 
     public function testWithoutOutcomeTheSpanEndsAsSuccess(): void
     {
-        $profiling = new RecordingProfilingFactory();
-        $handle = new ProfiledOperationHandle(new RecordingOperationHandle(), new Span('operation payment.validation'), $profiling);
+        $this->handle()->end();
 
-        $handle->end();
-
-        self::assertSame([['outcome' => 'success']], $profiling->endContexts);
+        self::assertSame([[Outcome::Success, null]], $this->endedWith);
     }
 
     public function testSucceedWinsOverALaterFailure(): void
     {
-        $log = new CallLog();
-        $profiling = new RecordingProfilingFactory();
-        $handle = new ProfiledOperationHandle(new RecordingOperationHandle($log), new Span('operation payment.validation'), $profiling);
+        $handle = $this->handle();
 
         $handle->succeed();
         $handle->fail(new RuntimeException('late'));
         $handle->end();
 
-        self::assertSame(['inner.succeed', 'inner.fail', 'inner.end'], $log->calls);
-        self::assertSame([['outcome' => 'success']], $profiling->endContexts);
+        self::assertSame(['inner.succeed', 'inner.fail', 'inner.end', 'span.end'], $this->log->calls);
+        self::assertSame([[Outcome::Success, null]], $this->endedWith);
     }
 
-    public function testFailWithoutReasonEndsAsErrorWithoutExceptionKey(): void
+    public function testFailWithoutReasonEndsAsError(): void
     {
-        $profiling = new RecordingProfilingFactory();
-        $handle = new ProfiledOperationHandle(new RecordingOperationHandle(), new Span('operation payment.validation'), $profiling);
+        $handle = $this->handle();
 
         $handle->fail();
         $handle->failExpected(new RuntimeException('late'));
         $handle->end();
 
-        self::assertSame([['outcome' => 'error']], $profiling->endContexts);
+        self::assertSame([[Outcome::Error, null]], $this->endedWith);
     }
 
     public function testInnerEndRunsBeforeTheSpanEnds(): void
     {
-        $log = new CallLog();
-        $handle = new ProfiledOperationHandle(new RecordingOperationHandle($log), new Span('operation payment.validation'), new RecordingProfilingFactory($log));
+        $this->handle()->end();
 
-        $handle->end();
-
-        self::assertSame(['inner.end', 'span.end'], $log->calls);
-    }
-
-    public function testAThrowingEndSpanDoesNotEscape(): void
-    {
-        $log = new CallLog();
-        $handle = new ProfiledOperationHandle(new RecordingOperationHandle($log), new Span('operation payment.validation'), new RecordingProfilingFactory($log, failOnEnd: true));
-
-        $handle->end();
-        $handle->end();
-
-        self::assertSame(['inner.end', 'span.end', 'inner.end'], $log->calls);
+        self::assertSame(['inner.end', 'span.end'], $this->log->calls);
     }
 
     public function testTheSpanEndsEvenWhenTheInnerEndThrows(): void
     {
-        $log = new CallLog();
-        $handle = new ProfiledOperationHandle(new RecordingOperationHandle($log, failOnEnd: true), new Span('operation payment.validation'), new RecordingProfilingFactory($log));
+        $handle = $this->handle(new RecordingOperationHandle($this->log, failOnEnd: true));
 
         $caught = null;
         try {
@@ -108,6 +95,32 @@ final class ProfiledOperationHandleTest extends TestCase
         }
 
         self::assertSame('inner end failed', $caught?->getMessage());
-        self::assertSame(['inner.end', 'span.end'], $log->calls);
+        self::assertSame(['inner.end', 'span.end'], $this->log->calls);
+    }
+
+    // The inner handle must not throw by contract; if it does, the decorator stays transparent and the span keeps
+    // the default outcome.
+    public function testAThrowingInnerOutcomePropagatesAndLeavesTheSpanOutcomeUndecided(): void
+    {
+        $handle = $this->handle(new RecordingOperationHandle($this->log, failOnDecide: true));
+
+        $caught = null;
+        try {
+            $handle->fail(new RuntimeException('boom'));
+        } catch (RuntimeException $e) {
+            $caught = $e;
+        }
+        $handle->end();
+
+        self::assertSame('inner outcome failed', $caught?->getMessage());
+        self::assertSame([[Outcome::Success, null]], $this->endedWith);
+    }
+
+    private function handle(?RecordingOperationHandle $inner = null): ProfiledOperationHandle
+    {
+        return new ProfiledOperationHandle($inner ?? new RecordingOperationHandle($this->log), function (Outcome $outcome, ?Throwable $reason): void {
+            $this->log->add('span.end');
+            $this->endedWith[] = [$outcome, $reason];
+        });
     }
 }

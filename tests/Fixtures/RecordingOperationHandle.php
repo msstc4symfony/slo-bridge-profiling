@@ -19,6 +19,7 @@ final class RecordingOperationHandle implements OperationHandleInterface
     public function __construct(
         private readonly CallLog $log = new CallLog(),
         private readonly bool $failOnEnd = false,
+        private readonly bool $failOnDecide = false,
     ) {
     }
 
@@ -26,6 +27,7 @@ final class RecordingOperationHandle implements OperationHandleInterface
     public function succeed(): void
     {
         $this->log->add('inner.succeed');
+        $this->failIfAsked();
     }
 
     #[Override]
@@ -40,6 +42,7 @@ final class RecordingOperationHandle implements OperationHandleInterface
     {
         $this->log->add('inner.fail');
         $this->reasons[] = $reason;
+        $this->failIfAsked();
     }
 
     #[Override]
@@ -48,6 +51,13 @@ final class RecordingOperationHandle implements OperationHandleInterface
         $this->log->add('inner.end');
         if ($this->failOnEnd) {
             throw new RuntimeException('inner end failed');
+        }
+    }
+
+    private function failIfAsked(): void
+    {
+        if ($this->failOnDecide) {
+            throw new RuntimeException('inner outcome failed');
         }
     }
 }

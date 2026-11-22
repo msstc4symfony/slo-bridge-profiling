@@ -40,13 +40,29 @@ final readonly class ProfiledOperationMonitor implements OperationMonitorInterfa
     ) {
     }
 
+    /**
+     * The span opens before the inner handle starts its clock, so opening it never counts as operation latency.
+     */
     #[Override]
     public function start(string $name): OperationHandleInterface
     {
-        $handle = $this->inner->start($name);
         $span = $this->openSpan($name);
+        if (!$span instanceof SpanInterface) {
+            return $this->inner->start($name);
+        }
 
-        return $span instanceof SpanInterface ? new ProfiledOperationHandle($handle, $span, $this->profiling) : $handle;
+        try {
+            $handle = $this->inner->start($name);
+        } catch (Throwable $e) {
+            $this->endSpan($name, $span, Outcome::Error, $e);
+
+            throw $e;
+        }
+
+        return new ProfiledOperationHandle(
+            $handle,
+            fn (Outcome $outcome, ?Throwable $reason) => $this->endSpan($name, $span, $outcome, $reason),
+        );
     }
 
     #[Override]
@@ -65,7 +81,7 @@ final readonly class ProfiledOperationMonitor implements OperationMonitorInterfa
 
             throw $e;
         } finally {
-            $this->endSpan($name, $span, $failure);
+            $this->endSpan($name, $span, $this->outcome($failure), $failure);
         }
     }
 
@@ -93,16 +109,16 @@ final readonly class ProfiledOperationMonitor implements OperationMonitorInterfa
         }
     }
 
-    private function endSpan(string $name, SpanInterface $span, ?Throwable $failure): void
+    private function endSpan(string $name, SpanInterface $span, Outcome $outcome, ?Throwable $reason): void
     {
         try {
-            $this->profiling->endSpan($span, SpanEndContext::of($this->outcome($name, $failure), $failure));
+            $this->profiling->endSpan($span, SpanEndContext::of($outcome, $reason));
         } catch (Throwable $e) {
             $this->warn('SLO operation span could not be ended.', $name, $e);
         }
     }
 
-    private function outcome(string $name, ?Throwable $failure): Outcome
+    private function outcome(?Throwable $failure): Outcome
     {
         if (!$failure instanceof Throwable) {
             return Outcome::Success;
@@ -110,9 +126,8 @@ final readonly class ProfiledOperationMonitor implements OperationMonitorInterfa
 
         try {
             return $this->classifier->isExpectedFailure($failure) ? Outcome::ExpectedFailure : Outcome::Error;
-        } catch (Throwable $e) {
-            $this->warn('SLO operation exception could not be classified, it counts as an error.', $name, $e);
-
+        } catch (Throwable) {
+            // The inner OperationMonitor classifies the same exception and already warns about the failure.
             return Outcome::Error;
         }
     }

@@ -7,12 +7,13 @@
   `['outcome' => …, 'exception' => get_debug_type()]`. `$logger` автовайрится (тег `monolog.logger`, канал
   `slo_bundle`): `service('logger')->ignoreOnInvalid()` передал бы `null` в типизированный параметр.
 - `measure()`: спан открывается до вызова внутреннего монитора, закрывается в `finally` с исходом от классификатора;
-  `start()`: сначала внутренний handle, затем спан; `ProfiledOperationHandle::end()` сначала завершает внутренний
-  handle (SLO-событие), потом спан. Не завершённый handle оставляет спан неявному завершению profiling-bundle.
+  `start()`: сначала спан, затем внутренний handle; `ProfiledOperationHandle` получает от монитора замыкание
+  `Closure(Outcome, ?Throwable): void`, которое закрывает спан и логирует сбой (`SLO operation span could not be
+  ended.`, контекст `operation`); `end()` сначала завершает внутренний handle (SLO-событие), потом спан. Не завершённый handle оставляет спан неявному завершению profiling-bundle.
 - Сервисы бандла приватные, id = FQCN; потребитель получает их автовайрингом.
-- Слои (`deptrac.yaml`) — копия `bundle-standard/templates/deptrac.yaml` v3 с полным каноническим ruleset
+- Слои (`deptrac.yaml`) — копия `bundle-standard/templates/deptrac.yaml` v4.1.0 (заголовок шаблона) с полным каноническим ruleset
   (Domain ← DomainService ← Application ← Infrastructure / Presentation / Framework; DependencyInjection — все слои,
   кроме BundleRoot; BundleRoot — Application и DependencyInjection); `BundleRoot` = `^…\\SloBridgeProfilingBundle$`
-  (`bin/init` переименовывает токен, якоря остаются). `verify-standard` v3 сверяет его с шаблоном.
+  (`bin/init` переименовывает токен, якоря остаются). `verify-standard` сверяет его с шаблоном.
 - `#[Override]` на всех переопределениях — PHPStan `checkMissingOverrideMethodAttribute` из шаблона.
   Domain/DomainService различаются подкаталогами `src/Domain/` (данные vs операции).

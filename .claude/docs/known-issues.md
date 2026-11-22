@@ -33,4 +33,24 @@
 - **PHPStan `deadCode.unreachable` после `measure(fn (): never => throw …)`**: шаблон возврата `measure()` выводит
   `never`, и `self::fail()` после вызова — недостижимый код. Ловить исключение в переменную и проверять после `try`.
 - **Infection**: `SloBridgeProfilingBundle::build()` не вызывает `parent::build()` — в 7.4 и 8.x он пустой, а вызов
-  давал эквивалентный мутант. Замер 2026-11-22 UTC — MSI 100 % (57/57), пороги 97/97.
+  давал эквивалентный мутант. Замер 2026-11-22 UTC — MSI 100 % (58/58), пороги 97/97.
+- **Правило «объявлено или конфликтует» продублировано** из slo-bundle: `ProfiledOperationMonitor::openSpan()`
+  повторяет условие `forPoint() === [] && conflictedNamesFor() === []` из
+  `monitor-bundle/src/Application/Operation/OperationMonitor.php` (`start()`, строка 51 на rc.2). При изменении
+  правила в slo-bundle менять оба места. Идея на следующий rc slo-bundle — публичный helper
+  (`SloCatalogInterface::declaresOperation()` или аналог), чтобы мост не копировал условие.
+- **Спан и SLO-событие расходятся в двух случаях** (README «The span»): (1) slo-bundle вернул `NoopOperationHandle`
+  для объявленного имени (упали часы/конструктор handle, warning «SLO operation cannot be monitored») — спан
+  получает outcome, события нет; (2) внешний handle завершён раньше внутреннего — profiling неявно завершает
+  дочерний спан (`profiling_implicit_end: true`, без `outcome`), событие внутреннего handle при этом корректно
+  (`KernelBridgeTest::testAnInnerHandleEndedAfterItsOuterOneLosesItsOutcomeOnlyInTheSpan`).
+- **Порядок в `start()`**: сначала спан, потом `inner->start()` — открытие спана (decision makers, процессоры) не
+  попадает в latency SLO; если `inner->start()` бросит (нарушение контракта), спан закрывается с `error` и
+  исключение пробрасывается. `measure()`: `span.create → inner.measure → span.end`.
+- **Классификатор бросил в `measure()`**: мост считает `error` без своего warning — внутренний `OperationMonitor`
+  классифицирует то же исключение и уже пишет предупреждение.
+- **Бросающий внутренний handle** (`succeed()`/`fail()`/`end()`) — нарушение контракта slo-bundle; декоратор
+  прозрачен: исключение пробрасывается, исход спана не фиксируется (останется `success`), спан в `end()` всё равно
+  закрывается (`ProfiledOperationHandleTest`).
+- **`rector.php` пропускает устаревший `PostIncDecToPreIncDecRector`** — файл байт-в-байт из bundle-standard
+  (`ExactFileRule`), править только в стандарте.

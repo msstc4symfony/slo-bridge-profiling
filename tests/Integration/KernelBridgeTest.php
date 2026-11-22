@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\SloBridgeProfiling\Test\Integration;
 
+use DomainException;
 use Monolog\Handler\TestHandler;
 use Monolog\Level;
 use Monolog\LogRecord;
@@ -18,8 +19,10 @@ use Msstc4Symfony\SloBundle\Infrastructure\MetricsBundle\SloMetric;
 use Override;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Filesystem\Filesystem;
+use Throwable;
 
 /**
  * @phpstan-import-type EndedSpanShape from RecordingEndProcessor
@@ -149,6 +152,76 @@ final class KernelBridgeTest extends TestCase
         self::assertSame(self::GOOD_EVENTS, $this->sloEvents());
     }
 
+    public function testExpectedFailureOfAnApplicationClassifierIsTheSameInSpanAndSlo(): void
+    {
+        $this->boot(appClassifier: true);
+        $rejection = new DomainException('Card declined.');
+
+        self::assertSame($rejection, $this->measureFailing('payment.validation', $rejection));
+        self::assertSame([$this->endedSpan(self::SPAN, null, ['outcome' => 'expected_failure', 'exception' => DomainException::class])], $this->spans());
+        self::assertSame(self::GOOD_EVENTS, $this->sloEvents());
+    }
+
+    public function testAnErrorIsTheSameInSpanAndSlo(): void
+    {
+        $failure = new RuntimeException('Gateway down.');
+
+        self::assertSame($failure, $this->measureFailing('payment.validation', $failure));
+        self::assertSame([$this->endedSpan(self::SPAN, null, ['outcome' => 'error', 'exception' => RuntimeException::class])], $this->spans());
+        self::assertSame([['payment.validation', 'availability', 'bad']], $this->sloEvents());
+    }
+
+    public function testAHandleFailureIsTheSameInSpanAndSlo(): void
+    {
+        $handle = $this->monitor()->start('payment.validation');
+        $handle->fail(new RuntimeException('Gateway down.'));
+        $handle->end();
+
+        self::assertSame([$this->endedSpan(self::SPAN, null, ['outcome' => 'error', 'exception' => RuntimeException::class])], $this->spans());
+        self::assertSame([['payment.validation', 'availability', 'bad']], $this->sloEvents());
+    }
+
+    public function testAnExpectedHandleFailureIsTheSameInSpanAndSlo(): void
+    {
+        $handle = $this->monitor()->start('payment.validation');
+        $handle->failExpected(new DomainException('Card declined.'));
+        $handle->end();
+
+        self::assertSame([$this->endedSpan(self::SPAN, null, ['outcome' => 'expected_failure', 'exception' => DomainException::class])], $this->spans());
+        self::assertSame(self::GOOD_EVENTS, $this->sloEvents());
+    }
+
+    public function testANestedHandleIsAChildSpan(): void
+    {
+        $monitor = $this->monitor();
+        $outer = $monitor->start('payment.validation');
+        $inner = $monitor->start('payment.capture');
+        $inner->end();
+
+        $outer->end();
+
+        self::assertSame([
+            $this->endedSpan('operation payment.capture', self::SPAN, ['outcome' => 'success']),
+            $this->endedSpan(self::SPAN, null, ['outcome' => 'success']),
+        ], $this->spans());
+    }
+
+    public function testAnInnerHandleEndedAfterItsOuterOneLosesItsOutcomeOnlyInTheSpan(): void
+    {
+        $monitor = $this->monitor();
+        $outer = $monitor->start('payment.validation');
+        $inner = $monitor->start('payment.capture');
+        $outer->end();
+        $inner->fail(new RuntimeException('Gateway down.'));
+        $inner->end();
+
+        self::assertSame([
+            $this->endedSpan('operation payment.capture', self::SPAN, ['profiling_implicit_end' => true]),
+            $this->endedSpan(self::SPAN, null, ['outcome' => 'success']),
+        ], $this->spans());
+        self::assertSame([['payment.capture', 'availability', 'bad'], ...self::GOOD_EVENTS], $this->sloEvents());
+    }
+
     public function testUnreachableStorageDoesNotChangeTheResult(): void
     {
         $this->boot(unreachableStorage: true);
@@ -159,22 +232,31 @@ final class KernelBridgeTest extends TestCase
     }
 
     /**
-     * @param array<string, string> $context
+     * @param array<string, string|true> $context
      *
-     * @return array{message: string, parent: ?string, context: array<string, string>}
+     * @return array{message: string, parent: ?string, context: array<string, string|true>}
      */
     private function endedSpan(string $message, ?string $parent, array $context): array
     {
         return ['message' => $message, 'parent' => $parent, 'context' => $context];
     }
 
+    private function measureFailing(string $name, Throwable $failure): Throwable
+    {
+        try {
+            $this->monitor()->measure($name, static fn (): never => throw $failure);
+        } catch (Throwable $e) {
+            return $e;
+        }
+    }
+
     /**
      * @param list<string>|null $spanBlacklist
      */
-    private function boot(?array $spanBlacklist = null, bool $unreachableStorage = false, bool $unopenableSpans = false): void
+    private function boot(?array $spanBlacklist = null, bool $unreachableStorage = false, bool $unopenableSpans = false, bool $appClassifier = false): void
     {
         $this->kernel?->shutdown();
-        $this->kernel = new TestKernel('test', false, $spanBlacklist, $unreachableStorage, $unopenableSpans);
+        $this->kernel = new TestKernel('test', false, $spanBlacklist, $unreachableStorage, $unopenableSpans, $appClassifier);
         $this->kernel->boot();
     }
 

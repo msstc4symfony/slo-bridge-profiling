@@ -8,6 +8,7 @@ use Closure;
 use Msstc4Symfony\SloBridgeProfiling\Infrastructure\Profiling\ProfiledOperationHandle;
 use Msstc4Symfony\SloBridgeProfiling\Infrastructure\Profiling\ProfiledOperationMonitor;
 use Msstc4Symfony\SloBridgeProfiling\Infrastructure\Profiling\SpanEndContext;
+use Msstc4Symfony\SloBridgeProfiling\Test\Fixtures\CallLog;
 use Msstc4Symfony\SloBridgeProfiling\Test\Fixtures\RecordingLogger;
 use Msstc4Symfony\SloBridgeProfiling\Test\Fixtures\RecordingOperationHandle;
 use Msstc4Symfony\SloBridgeProfiling\Test\Fixtures\RecordingOperationMonitor;
@@ -89,7 +90,25 @@ final class ProfiledOperationMonitorTest extends TestCase
 
         self::assertSame($failure, $this->caught(fn (): mixed => $this->monitor(classifier: new StubClassifier(fail: true))->measure(self::NAME, static fn (): never => throw $failure)));
         self::assertSame([['outcome' => 'error', 'exception' => RuntimeException::class]], $this->profiling->endContexts);
-        $this->assertOneWarning('SLO operation exception could not be classified, it counts as an error.');
+        // The inner OperationMonitor reports the classification failure; a second warning would double it.
+        self::assertSame([], $this->logger->records);
+    }
+
+    public function testMeasureOpensTheSpanBeforeTheInnerMonitorAndEndsItAfter(): void
+    {
+        $log = new CallLog();
+        $this->inner = new RecordingOperationMonitor(log: $log);
+        $this->profiling = new RecordingProfilingFactory($log);
+
+        $this->monitor()->measure(self::NAME, static fn (): int => 42);
+
+        self::assertSame(['span.create', 'inner.measure', 'span.end'], $log->calls);
+    }
+
+    public function testAnotherDeclaredPointOpensNoSpan(): void
+    {
+        self::assertSame(42, $this->monitor()->measure('payment.capture', static fn (): int => 42));
+        self::assertSame([], $this->profiling->messages);
     }
 
     public function testUndeclaredNameOpensNoSpan(): void
@@ -168,16 +187,17 @@ final class ProfiledOperationMonitorTest extends TestCase
     public function testAFailingLoggerIsSwallowed(): void
     {
         $this->profiling = new RecordingProfilingFactory(failOnCreate: true);
-        $monitor = new ProfiledOperationMonitor($this->inner, $this->profiling, StubSloCatalog::declaring(), new StubClassifier(fail: true), new ThrowingLogger());
+        $monitor = $this->monitor(logger: new ThrowingLogger());
         $failure = new RuntimeException('boom');
 
         self::assertSame(42, $monitor->measure(self::NAME, static fn (): int => 42));
         self::assertSame($failure, $this->caught(static fn (): mixed => $monitor->measure(self::NAME, static fn (): never => throw $failure)));
     }
 
-    public function testAFailingLoggerIsSwallowedWhenTheClassifierThrows(): void
+    public function testAFailingLoggerIsSwallowedWhenTheSpanCannotBeEnded(): void
     {
-        $monitor = new ProfiledOperationMonitor($this->inner, $this->profiling, StubSloCatalog::declaring(), new StubClassifier(fail: true), new ThrowingLogger());
+        $this->profiling = new RecordingProfilingFactory(failOnEnd: true);
+        $monitor = $this->monitor(logger: new ThrowingLogger());
         $failure = new RuntimeException('boom');
 
         self::assertSame($failure, $this->caught(static fn (): mixed => $monitor->measure(self::NAME, static fn (): never => throw $failure)));
@@ -204,6 +224,37 @@ final class ProfiledOperationMonitorTest extends TestCase
         $handle->end();
 
         self::assertSame([['outcome' => 'success']], $this->profiling->endContexts);
+    }
+
+    public function testStartOpensTheSpanBeforeTheInnerClockStarts(): void
+    {
+        $log = new CallLog();
+        $this->inner = new RecordingOperationMonitor(log: $log);
+        $this->profiling = new RecordingProfilingFactory($log);
+
+        $this->monitor()->start(self::NAME);
+
+        self::assertSame(['span.create', 'inner.start'], $log->calls);
+    }
+
+    public function testAThrowingInnerStartEndsTheSpanAsErrorAndRethrows(): void
+    {
+        $this->inner = new RecordingOperationMonitor(failOnStart: true);
+
+        $caught = $this->caught(fn (): mixed => $this->monitor()->start(self::NAME));
+
+        self::assertSame('inner start failed', $caught?->getMessage());
+        self::assertSame([['outcome' => 'error', 'exception' => RuntimeException::class]], $this->profiling->endContexts);
+    }
+
+    public function testAThrowingEndSpanOfAHandleIsLogged(): void
+    {
+        $this->profiling = new RecordingProfilingFactory(failOnEnd: true);
+
+        $this->monitor()->start(self::NAME)->end();
+
+        self::assertSame([['outcome' => 'success']], $this->profiling->endContexts);
+        $this->assertOneWarning('SLO operation span could not be ended.');
     }
 
     public function testStartForAnUndeclaredNameReturnsTheInnerHandle(): void
@@ -240,7 +291,7 @@ final class ProfiledOperationMonitorTest extends TestCase
     }
 
     /**
-     * @param Closure(): int $call
+     * @param Closure(): mixed $call
      */
     private function caught(Closure $call): ?Throwable
     {
