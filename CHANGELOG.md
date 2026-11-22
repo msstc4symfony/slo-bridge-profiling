@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.0.0] - 2026-11-22
+
+- Changed: requires slo-bundle ^1.0 (stable).
+
 ## [1.0.0-rc.1] - 2026-11-22
 
 - First release candidate: decorates slo-bundle's `OperationMonitorInterface` and opens a profiling-bundle span

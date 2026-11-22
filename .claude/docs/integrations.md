@@ -1,8 +1,8 @@
 # Интеграции
 
-- **slo-bundle** (`^1.0.0-rc.2`): декорируется `OperationMonitorInterface` (алиас на `OperationMonitor`, тег
+- **slo-bundle** (`^1.0`): декорируется `OperationMonitorInterface` (алиас на `OperationMonitor`, тег
   `kernel.reset` остаётся на внутреннем сервисе). Читаются `SloCatalogInterface::forPoint()` /
-  `conflictedNamesFor()` (объявлено ли имя — то же правило, что в `OperationMonitor::start()`) и публичный с rc.2
+  `conflictedNamesFor()` (объявлено ли имя — то же правило, что в `OperationMonitor::start()`) и публичный с 1.0
   `ExpectedFailureClassifierInterface` (классификация как в `measure()`; адаптер выбирает slo-bundle по наличию
   logic-bundle: `ActionOutcome` → `ExpectedFailureInterface` → null-классификатор). Приложение может переопределить
   алиас своим классификатором — мост и slo-bundle используют один и тот же сервис

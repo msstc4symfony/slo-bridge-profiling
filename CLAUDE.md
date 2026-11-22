@@ -11,11 +11,12 @@ Library code only.
 
 ## Common commands
 
-Until slo-bundle 1.0.0-rc.2 is tagged, develop against the git-ignored local profile
-`COMPOSER=composer-local.json composer install` (path repo `../monitor-bundle`).
+slo-bundle 1.0 is released: `COMPOSER=composer-ci.json composer install` resolves it from the vcs repo. For
+unreleased slo-bundle work use the git-ignored local profile `COMPOSER=composer-local.json composer install`
+(path repo `../monitor-bundle`).
 
 - `make check` — `php -l`, PHPStan level 10, PHP-CS-Fixer, `composer validate --strict`,
-  `composer audit`, Rector dry-run, deptrac. Run as `COMPOSER=composer-local.json make check` (until rc.2 is tagged).
+  `composer audit`, Rector dry-run, deptrac. Run as `COMPOSER=composer-ci.json make check`.
 - `make test` — unit + integration suites (`tests/Integration/KernelBridgeTest` boots a real kernel with every
   bundle, logic-bundle only when installed); `make infection`, `make fix`,
   `make regenerate-baseline`.

@@ -51,7 +51,7 @@
     "composer-runtime-api": ">=2.2",
     "msstc4symfony/metrics-bundle": "^2.3",
     "msstc4symfony/profiling-bundle": "^2.3.1",
-    "msstc4symfony/slo-bundle": "^1.0.0-rc.2",
+    "msstc4symfony/slo-bundle": "^1.0",
     "psr/log": "^2.0|^3.0",
     "symfony/config": "^7.4|^8.0",
     "symfony/dependency-injection": "^7.4|^8.0",

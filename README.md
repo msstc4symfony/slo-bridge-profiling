@@ -9,9 +9,9 @@ tree of the request, command or message that ran it, ended with the same outcome
 
 ## Compatibility
 
-| Bundle      | PHP  | Symfony  | slo-bundle   | profiling-bundle | metrics-bundle |
+| Bridge      | PHP  | Symfony  | slo-bundle   | profiling-bundle | metrics-bundle |
 |-------------|------|----------|--------------|------------------|----------------|
-| 1.0.0-rc.1  | 8.2+ | 7.4, 8.x | ^1.0.0-rc.2  | ^2.3.1           | ^2.3           |
+| 1.x         | 8.2+ | 7.4, 8.x | ^1.0         | ^2.3.1           | ^2.3           |
 
 Symfony 8.x needs PHP 8.4; on PHP 8.2 and 8.3 Composer installs Symfony 7.4. logic-bundle is optional: with it,
 exceptions implementing its `ExpectedFailureInterface` (or classified by its `ActionOutcome`) are expected failures.
@@ -27,11 +27,8 @@ composer config repositories.msstc4symfony-metrics vcs https://github.com/msstc4
 composer config repositories.msstc4symfony-sql-labeller vcs https://github.com/msstc4symfony/sql-labeller
 composer config repositories.msstc4symfony-profiling vcs https://github.com/msstc4symfony/profiling-bundle
 composer config repositories.msstc4symfony-slo-bridge-profiling vcs https://github.com/msstc4symfony/slo-bridge-profiling
-composer require msstc4symfony/slo-bridge-profiling:^1.0.0-rc.1 msstc4symfony/slo-bundle:^1.0.0-rc.2
+composer require msstc4symfony/slo-bridge-profiling
 ```
-
-Naming slo-bundle explicitly lets Composer accept its release candidate under `minimum-stability: stable` (only
-root requirements may lower stability); alternatively set `minimum-stability: RC` with `prefer-stable: true`.
 
 Register the bridge in `config/bundles.php` alongside the bundles it connects (order does not matter):
 
