@@ -6,6 +6,9 @@
   открывается только для объявленных имён (определение или конфликт в `SloCatalogInterface`), end context
   `['outcome' => …, 'exception' => get_debug_type()]`. `$logger` автовайрится (тег `monolog.logger`, канал
   `slo_bundle`): `service('logger')->ignoreOnInvalid()` передал бы `null` в типизированный параметр.
+- `measure()`: спан открывается до вызова внутреннего монитора, закрывается в `finally` с исходом от классификатора;
+  `start()`: сначала внутренний handle, затем спан; `ProfiledOperationHandle::end()` сначала завершает внутренний
+  handle (SLO-событие), потом спан. Не завершённый handle оставляет спан неявному завершению profiling-bundle.
 - Сервисы бандла приватные, id = FQCN; потребитель получает их автовайрингом.
 - Слои (`deptrac.yaml`) — копия `bundle-standard/templates/deptrac.yaml` v3 с полным каноническим ruleset
   (Domain ← DomainService ← Application ← Infrastructure / Presentation / Framework; DependencyInjection — все слои,

@@ -15,7 +15,9 @@ Until slo-bundle 1.0.0-rc.2 is tagged, develop against the git-ignored local pro
 
 - `make check` — `php -l`, PHPStan level 10, PHP-CS-Fixer, `composer validate --strict`,
   `composer audit`, Rector dry-run, deptrac. Run as `COMPOSER=composer-local.json make check` (until rc.2 is tagged).
-- `make test` — unit + integration suites; `make infection`, `make fix`, `make regenerate-baseline`.
+- `make test` — unit + integration suites (`tests/Integration/KernelBridgeTest` boots a real kernel with every
+  bundle, logic-bundle only when installed); `make infection`, `make fix`,
+  `make regenerate-baseline`.
 - `php ../bundle-standard/bin/verify-standard.php .` — standard compliance (the same check CI runs).
 
 ## Architecture in 60 seconds
@@ -31,4 +33,5 @@ Details: `.claude/docs/architecture.md`. **Read `.claude/docs/known-issues.md` b
 
 - `.claude/docs/architecture.md` — layers, wiring, service ids.
 - `.claude/docs/conventions.md` — layout, tests, commits.
-- `.claude/docs/known-issues.md` — family-wide Symfony/CI traps.
+- `.claude/docs/integrations.md` — slo-bundle, profiling-bundle, Monolog, metrics- and tracing-bridge-profiling.
+- `.claude/docs/known-issues.md` — Symfony/CI traps, kernel-test gotchas.

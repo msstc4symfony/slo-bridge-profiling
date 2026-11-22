@@ -25,3 +25,12 @@
   `OperationMonitorInterface` алиасом на `OperationMonitor` с тегом `kernel.reset` — тег остаётся на внутреннем
   сервисе (`ContainerWiringTest::testKernelResetStaysOnTheInnerMonitor`). Если slo-bundle сделает интерфейс
   самостоятельным сервисом с тегом, декоратору понадобится `ResetInterface` с делегированием.
+- **Kernel-тест с разными конфигурациями**: `TestKernel` принимает `$spanBlacklist` / `$unreachableStorage`;
+  каталог кеша включает хеш этих флагов, иначе второй `boot()` в том же процессе возьмёт закешированный контейнер
+  с другой конфигурацией.
+- **`monolog.logger.slo_bundle` под metrics-bundle — не `Monolog\Logger`**, а `HandlerDecorator` (счётчик ошибок
+  metrics-bundle). Канал проверять по записи в `TestHandler` (`monolog.handler.main`), а не через `instanceof Logger`.
+- **PHPStan `deadCode.unreachable` после `measure(fn (): never => throw …)`**: шаблон возврата `measure()` выводит
+  `never`, и `self::fail()` после вызова — недостижимый код. Ловить исключение в переменную и проверять после `try`.
+- **Infection**: экранированный мутант `parent::build()` в `SloBridgeProfilingBundle::build()` — эквивалентный
+  (`Bundle::build()` пустой); замер 2026-11-22 UTC — MSI 98.28 % (57/58), пороги 95/95.

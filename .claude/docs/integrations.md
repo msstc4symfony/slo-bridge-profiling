@@ -1,0 +1,20 @@
+# Интеграции
+
+- **slo-bundle** (`^1.0.0-rc.2`): декорируется `OperationMonitorInterface` (алиас на `OperationMonitor`, тег
+  `kernel.reset` остаётся на внутреннем сервисе). Читаются `SloCatalogInterface::forPoint()` /
+  `conflictedNamesFor()` (объявлено ли имя — то же правило, что в `OperationMonitor::start()`) и публичный с rc.2
+  `ExpectedFailureClassifierInterface` (классификация как в `measure()`; адаптер выбирает slo-bundle по наличию
+  logic-bundle: `ActionOutcome` → `ExpectedFailureInterface` → null-классификатор).
+- **profiling-bundle** (`^2.3.1`): `ProfilingFactoryInterface::createSpan()` / `endSpan()`. Решение «писать ли
+  спан» принимают decision makers profiling-bundle (`spans.whitelist|blacklist` — префиксы, `ListBasedDecisionMaker`
+  с приоритетом -1024); SLO-события от них не зависят
+  (`KernelBridgeTest::testSloEventsDoNotDependOnProfilingDecisions`). Вложенная операция — дочерний спан.
+- **Monolog**: тег `monolog.logger` channel `slo_bundle` на декораторе; `LoggerChannelPass` подставляет
+  `monolog.logger.slo_bundle` в автовайренный `$logger` (`KernelBridgeTest::testTheDecoratorLogsOnTheSloBundleChannel`).
+  С metrics-bundle этот сервис — `HandlerDecorator` metrics-bundle вокруг `Monolog\Logger`, не сам `Logger`.
+- **metrics-bundle**: SLO-события пишет slo-bundle (`SloMetric::EVENTS`, метки `[slo, objective, revision, result]`);
+  мост сам метрик не пишет. В kernel-тесте `MetricRecorderInterface` переалиасен на `RecordingMetricRecorder`
+  / `ThrowingMetricRecorder`.
+- **metrics-bridge-profiling**: превращает каждое `message` спана в серию
+  `symfony_profiling_span_duration_histogram_seconds{message}` — поэтому спаны только для объявленных имён.
+- **tracing-bridge-profiling** (suggest): кладёт каждый спан, в т.ч. `operation <name>`, в W3C-трейс.
